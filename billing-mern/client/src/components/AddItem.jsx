@@ -23,8 +23,8 @@ export default function AddItem() {
       setNotice({
         type: 'success',
         text: created
-          ? `Item "${item.name}" added to inventory.`
-          : `Updated ${item.name}. New quantity: ${item.quantity}.`,
+          ? `"${item.name}" added to inventory.`
+          : `"${item.name}" restocked. New quantity: ${item.quantity}.`,
       });
       setForm(emptyForm);
     } catch (err) {
@@ -36,14 +36,14 @@ export default function AddItem() {
 
   return (
     <div className="stack">
-      <h2>Add a New Item</h2>
+      <h2>Add or restock an item</h2>
       <form className="stack" onSubmit={handleSubmit}>
-        <input name="name" placeholder="Item Name" value={form.name} onChange={handleChange} required />
-        <input name="rate" type="number" min="0.01" step="0.01" placeholder="Rate (per item)"
+        <input name="name" placeholder="Item name" value={form.name} onChange={handleChange} required />
+        <input name="rate" type="number" min="0.01" step="0.01" placeholder="Rate per item (₹)"
           value={form.rate} onChange={handleChange} required />
         <input name="quantity" type="number" min="0" step="1" placeholder="Quantity"
           value={form.quantity} onChange={handleChange} required />
-        <button className="primary" disabled={busy}>Add Item to Inventory</button>
+        <button className="primary" disabled={busy}>Save item</button>
       </form>
       <Notice notice={notice} />
     </div>

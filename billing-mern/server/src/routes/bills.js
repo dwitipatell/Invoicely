@@ -1,19 +1,21 @@
 import { Router } from 'express';
 import Item from '../models/Item.js';
 import Bill from '../models/Bill.js';
+import { TAX_RATE, round2 } from '../config/billing.js';
 
 const router = Router();
 
-const round2 = (n) => Math.round(n * 100) / 100;
+const makeInvoiceNo = () =>
+  `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
 
-// Put back any stock that was already deducted when checkout fails part-way
+// Put back stock that was already deducted when checkout fails part-way
 async function restoreStock(deducted) {
   for (const { id, quantity } of deducted) {
     await Item.updateOne({ _id: id }, { $inc: { quantity } });
   }
 }
 
-// GET /api/bills  -> latest 50 bills
+// GET /api/bills -> latest 50 bills
 router.get('/', async (req, res, next) => {
   try {
     const bills = await Bill.find().sort({ createdAt: -1 }).limit(50).lean();
@@ -23,11 +25,12 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// POST /api/bills  body: { items: [{ name, quantity }] }
+// POST /api/bills  body: { customerName, items: [{ name, quantity }] }
 router.post('/', async (req, res, next) => {
+  const customerName = String(req.body.customerName ?? '').trim() || 'Walk-in customer';
   const requested = Array.isArray(req.body.items) ? req.body.items : [];
 
-  // Validate input and merge duplicate lines (same item picked twice)
+  // Validate and merge duplicate lines
   const merged = new Map();
   for (const line of requested) {
     const name = String(line?.name ?? '').trim();
@@ -38,9 +41,8 @@ router.post('/', async (req, res, next) => {
     const key = name.toLowerCase();
     merged.set(key, { name, quantity: (merged.get(key)?.quantity ?? 0) + quantity });
   }
-
   if (merged.size === 0) {
-    return res.status(400).json({ message: 'The bill is empty. Please add items before checking out.' });
+    return res.status(400).json({ message: 'The bill is empty. Add items before checkout.' });
   }
 
   const deducted = [];
@@ -51,7 +53,7 @@ router.post('/', async (req, res, next) => {
     for (const { name, quantity } of merged.values()) {
       const nameKey = name.toLowerCase();
 
-      // Deduct only if enough stock exists, in one atomic database operation
+      // Atomic: deduct only if enough stock exists
       const item = await Item.findOneAndUpdate(
         { nameKey, quantity: { $gte: quantity } },
         { $inc: { quantity: -quantity } },
@@ -62,19 +64,31 @@ router.post('/', async (req, res, next) => {
         await restoreStock(deducted);
         const existing = await Item.findOne({ nameKey }).lean();
         const message = existing
-          ? `Only ${existing.quantity} of ${existing.name} are available.`
+          ? `Only ${existing.quantity} of ${existing.name} available.`
           : `"${name}" was not found in inventory.`;
         return res.status(409).json({ message });
       }
 
       deducted.push({ id: item._id, quantity });
-      // amount = rate × quantity
       lines.push({ name: item.name, rate: item.rate, quantity, amount: round2(item.rate * quantity) });
     }
 
-    // total = Σ amount_i
-    const total = round2(lines.reduce((sum, line) => sum + line.amount, 0));
-    const bill = await Bill.create({ lines, total });
+    // subtotal = Σ amount_i
+    const subtotal = round2(lines.reduce((sum, l) => sum + l.amount, 0));
+    // taxAmount = subtotal × TAX_RATE / 100
+    const taxAmount = round2((subtotal * TAX_RATE) / 100);
+    // total = subtotal + taxAmount
+    const total = round2(subtotal + taxAmount);
+
+    const bill = await Bill.create({
+      invoiceNo: makeInvoiceNo(),
+      customerName,
+      lines,
+      subtotal,
+      taxRate: TAX_RATE,
+      taxAmount,
+      total,
+    });
 
     res.status(201).json(bill);
   } catch (err) {

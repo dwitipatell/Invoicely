@@ -1,74 +1,55 @@
-# Super Market Billing System (MERN)
+# Super Market Billing System v2 (MERN)
 
-A MERN stack version of a supermarket billing app: manage inventory, build a bill from stock, checkout (stock is deducted), and view bill history.
+Features
+- JWT login (passwords hashed with bcrypt)
+- Inventory: add, restock, edit, delete
+- Low-stock and out-of-stock alerts
+- Dashboard: revenue, bill count, item count, top-selling items (MongoDB aggregation)
+- Billing with customer name, GST, and atomic stock deduction with rollback
+- Printable invoices
+- Bill history
 
-Stack: MongoDB + Mongoose, Express, React (Vite), Node.js.
+## Run locally
 
-## Folder structure
+Server:
+    cd server
+    cp .env.example .env      (edit the values)
+    npm install
+    npm run dev
 
-```
-billing-mern/
-├── server/
-│   ├── src/
-│   │   ├── config/db.js
-│   │   ├── models/Item.js
-│   │   ├── models/Bill.js
-│   │   ├── routes/items.js
-│   │   ├── routes/bills.js
-│   │   ├── middleware/errorHandler.js
-│   │   └── index.js
-│   ├── .env.example
-│   └── package.json
-└── client/
-    ├── src/
-    │   ├── components/AddItem.jsx
-    │   ├── components/GenerateBill.jsx
-    │   ├── components/ViewInventory.jsx
-    │   ├── components/BillHistory.jsx
-    │   ├── components/Notice.jsx
-    │   ├── api.js
-    │   ├── format.js
-    │   ├── App.jsx
-    │   ├── main.jsx
-    │   └── index.css
-    ├── index.html
-    ├── vite.config.js
-    └── package.json
-```
+Client, in a second terminal:
+    cd client
+    npm install
+    npm run dev               (open http://localhost:5173)
 
-## Setup (step by step)
+On first start, the server creates the admin user from ADMIN_USERNAME and ADMIN_PASSWORD. After that, these two variables are ignored.
 
-1. Install Node.js 18 or newer, and MongoDB Community Server (or create a free MongoDB Atlas cluster and copy its connection string).
-2. Start MongoDB locally, or use your Atlas URI.
-3. Backend:
-   ```bash
-   cd server
-   cp .env.example .env        # on Windows: copy .env.example .env
-   # edit .env and set MONGO_URI
-   npm install
-   npm run dev                 # runs on http://localhost:5000
-   ```
-4. Frontend, in a second terminal:
-   ```bash
-   cd client
-   npm install
-   npm run dev                 # runs on http://localhost:5173
-   ```
-5. Open http://localhost:5173. The Vite dev server proxies `/api` requests to the backend.
+## Environment variables (server)
+
+| Name | Purpose |
+|---|---|
+| MONGO_URI | MongoDB Atlas connection string |
+| JWT_SECRET | Long random string used to sign login tokens |
+| ADMIN_USERNAME / ADMIN_PASSWORD | First login account, created automatically |
+| CLIENT_ORIGIN | Frontend URL allowed by CORS, no trailing slash |
+| TAX_RATE | GST percentage, default 5 |
+| LOW_STOCK_THRESHOLD | Quantity at or below which an item is low, default 5 |
+
+## Environment variables (client)
+
+| Name | Purpose |
+|---|---|
+| VITE_API_URL | Backend URL ending in /api, for example https://your-api.onrender.com/api |
 
 ## API
 
-| Method | Route | Purpose |
-|---|---|---|
-| GET | /api/health | Health check |
-| GET | /api/items | List all inventory items |
-| POST | /api/items | Add an item, or restock it if the name already exists |
-| POST | /api/bills | Checkout: validate stock, deduct it, save the bill |
-| GET | /api/bills | Latest 50 bills |
-
-## Core logic
-
-- Restock rule: if the item name already exists (case-insensitive), the new rate replaces the old one and `quantity = oldQuantity + newQuantity`.
-- Line amount: `amount = rate × quantity`
-- Bill total: `total = Σ amount_i`, calculated on the server using the server's stored rates, not the rates sent by the browser.
-- Checkout stock deduction uses a conditional update: `findOneAndUpdate({ nameKey, quantity: { $gte: requested } }, { $inc: { quantity: -requested } })`. If any line fails, the already-deducted lines are restored.
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| POST | /api/auth/login | No | Returns a JWT |
+| GET | /api/items | Yes | List items |
+| POST | /api/items | Yes | Add or restock an item |
+| PUT | /api/items/:id | Yes | Edit an item |
+| DELETE | /api/items/:id | Yes | Delete an item |
+| POST | /api/bills | Yes | Checkout with GST and stock deduction |
+| GET | /api/bills | Yes | Latest 50 bills |
+| GET | /api/dashboard | Yes | Totals, top items, low stock |

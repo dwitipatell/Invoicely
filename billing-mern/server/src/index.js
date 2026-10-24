@@ -1,12 +1,19 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { connectDB } from './config/db.js';
+import { seedAdmin } from './config/seedAdmin.js';
+import authRoutes from './routes/auth.js';
 import itemRoutes from './routes/items.js';
 import billRoutes from './routes/bills.js';
+import dashboardRoutes from './routes/dashboard.js';
+import { requireAuth } from './middleware/auth.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
-dotenv.config();
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET is not set. Add it to your environment variables.');
+  process.exit(1);
+}
 
 const app = express();
 
@@ -14,8 +21,14 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-app.use('/api/items', itemRoutes);
-app.use('/api/bills', billRoutes);
+
+// Public
+app.use('/api/auth', authRoutes);
+
+// Protected: every request must carry a valid JWT
+app.use('/api/items', requireAuth, itemRoutes);
+app.use('/api/bills', requireAuth, billRoutes);
+app.use('/api/dashboard', requireAuth, dashboardRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -23,9 +36,8 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 connectDB(process.env.MONGO_URI)
-  .then(() => {
-    app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-  })
+  .then(seedAdmin)
+  .then(() => app.listen(PORT, () => console.log(`Server running on port ${PORT}`)))
   .catch((err) => {
     console.error('Failed to start server:', err.message);
     process.exit(1);

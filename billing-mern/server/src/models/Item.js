@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const itemSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    // Lowercased copy of name, used for case-insensitive matching and uniqueness
+    // Lowercase copy of name, used for case-insensitive matching and uniqueness
     nameKey: { type: String, required: true, unique: true, index: true },
     rate: { type: Number, required: true, min: 0.01 },
     quantity: {

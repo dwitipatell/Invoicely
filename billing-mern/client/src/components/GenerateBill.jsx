@@ -1,29 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
-import { money } from '../format';
+import { money, round2 } from '../format';
 import Notice from './Notice';
+import Invoice from './Invoice';
 
 export default function GenerateBill() {
   const [inventory, setInventory] = useState([]);
+  const [taxRate, setTaxRate] = useState(0);
   const [cart, setCart] = useState([]);
+  const [customerName, setCustomerName] = useState('');
   const [selected, setSelected] = useState('');
   const [qty, setQty] = useState('');
   const [notice, setNotice] = useState(null);
+  const [invoice, setInvoice] = useState(null);
 
-  const loadInventory = () =>
-    api.getItems().then(setInventory).catch((err) => setNotice({ type: 'error', text: err.message }));
+  const loadData = () =>
+    Promise.all([api.getItems(), api.getDashboard()])
+      .then(([items, dash]) => {
+        setInventory(items);
+        setTaxRate(dash.taxRate);
+      })
+      .catch((err) => setNotice({ type: 'error', text: err.message }));
 
-  useEffect(() => {
-    loadInventory();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const sellable = inventory.filter((item) => item.quantity > 0);
-
-  // total = Σ (rate × quantity) over every cart line
-  const total = useMemo(
-    () => cart.reduce((sum, line) => sum + line.rate * line.quantity, 0),
+  // subtotal = Σ (rate × quantity)
+  const subtotal = useMemo(
+    () => round2(cart.reduce((sum, l) => sum + l.rate * l.quantity, 0)),
     [cart]
   );
+  // taxAmount = subtotal × taxRate / 100
+  const taxAmount = round2((subtotal * taxRate) / 100);
+  // total = subtotal + taxAmount
+  const total = round2(subtotal + taxAmount);
 
   function addToCart(e) {
     e.preventDefault();
@@ -35,7 +44,7 @@ export default function GenerateBill() {
       return;
     }
 
-    // Check stock: what is already in the cart + what is being added must fit in inventory
+    // Quantity already in cart + new quantity must fit in stock
     const inCart = cart.find((l) => l.nameKey === item.nameKey)?.quantity ?? 0;
     if (inCart + quantity > item.quantity) {
       setNotice({ type: 'error', text: `Only ${item.quantity - inCart} more of ${item.name} available.` });
@@ -49,63 +58,76 @@ export default function GenerateBill() {
         : [...prev, { nameKey: item.nameKey, name: item.name, rate: item.rate, quantity }];
     });
 
-    setNotice({ type: 'success', text: `Added ${quantity} of ${item.name} to the bill.` });
+    setNotice({ type: 'success', text: `Added ${quantity} × ${item.name}.` });
     setSelected('');
     setQty('');
   }
 
   async function checkout() {
     if (cart.length === 0) {
-      setNotice({ type: 'error', text: 'The bill is empty. Please add items before checking out.' });
+      setNotice({ type: 'error', text: 'The bill is empty. Add items before checkout.' });
       return;
     }
     try {
-      const bill = await api.checkout(cart.map(({ name, quantity }) => ({ name, quantity })));
+      const bill = await api.checkout({
+        customerName,
+        items: cart.map(({ name, quantity }) => ({ name, quantity })),
+      });
+      setInvoice(bill);
       setCart([]);
-      setNotice({ type: 'success', text: `Checkout complete. Bill total: ${money(bill.total)}.` });
+      setCustomerName('');
+      setNotice({ type: 'success', text: `Bill ${bill.invoiceNo} saved.` });
     } catch (err) {
       setNotice({ type: 'error', text: err.message });
     }
-    loadInventory(); // refresh stock either way
+    loadData(); // refresh stock either way
   }
+
+  const sellable = inventory.filter((i) => i.quantity > 0);
 
   return (
     <div className="stack">
-      <h2>Generate a New Bill</h2>
+      <h2>New bill</h2>
+
+      <input placeholder="Customer name (optional)" value={customerName}
+        onChange={(e) => setCustomerName(e.target.value)} />
 
       <div className="box">
         {cart.length === 0 ? (
-          <p className="muted">Your bill is empty. Add some items!</p>
+          <p className="muted">No items yet.</p>
         ) : (
-          cart.map((line) => (
-            <div className="cart-line" key={line.nameKey}>
-              <span>{line.name} x {line.quantity}</span>
-              <span>{money(line.rate * line.quantity)}</span>
+          cart.map((l) => (
+            <div className="cart-line" key={l.nameKey}>
+              <span>{l.name} × {l.quantity}</span>
+              <span>{money(l.rate * l.quantity)}</span>
             </div>
           ))
         )}
       </div>
 
       <form className="row" onSubmit={addToCart}>
-        <select value={selected} onChange={(e) => setSelected(e.target.value)} required style={{ flex: 2 }}>
+        <select value={selected} onChange={(e) => setSelected(e.target.value)} required>
           <option value="">Select an item</option>
-          {sellable.map((item) => (
-            <option key={item._id} value={item.nameKey}>
-              {item.name} ({money(item.rate)})
+          {sellable.map((i) => (
+            <option key={i._id} value={i.nameKey}>
+              {i.name} ({money(i.rate)}) – {i.quantity} left
             </option>
           ))}
         </select>
-        <input type="number" min="1" step="1" placeholder="Quantity" value={qty}
-          onChange={(e) => setQty(e.target.value)} required style={{ flex: 1 }} />
+        <input type="number" min="1" step="1" placeholder="Qty" value={qty}
+          onChange={(e) => setQty(e.target.value)} required />
         <button className="secondary">Add</button>
       </form>
 
-      <div className="box stack">
-        <div className="total">Total: {money(total)}</div>
-        <button className="primary" onClick={checkout}>Checkout Bill</button>
+      <div className="box stack summary">
+        <div className="cart-line"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+        <div className="cart-line"><span>GST ({taxRate}%)</span><span>{money(taxAmount)}</span></div>
+        <div className="cart-line total"><span>Total</span><span>{money(total)}</span></div>
+        <button className="primary" onClick={checkout}>Checkout</button>
       </div>
 
       <Notice notice={notice} />
+      {invoice && <Invoice bill={invoice} onClose={() => setInvoice(null)} />}
     </div>
   );
 }
