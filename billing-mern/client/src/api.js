@@ -12,22 +12,25 @@ async function request(path, options = {}) {
   const data = await res.json().catch(() => ({}));
 
   // Expired or invalid token: send the user back to the login page
-  if (res.status === 401 && path !== '/auth/login') {
+  if (res.status === 401 && !path.startsWith('/auth/')) {
     localStorage.removeItem('token');
+    localStorage.removeItem('username');
     window.dispatchEvent(new Event('logout'));
   }
   if (!res.ok) throw new Error(data.message || 'Request failed');
   return data;
 }
 
+const post = (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) });
+
 export const api = {
-  login: (username, password) =>
-    request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  register: (username, password) => post('/auth/register', { username, password }),
+  login: (username, password) => post('/auth/login', { username, password }),
   getDashboard: () => request('/dashboard'),
   getItems: () => request('/items'),
-  saveItem: (item) => request('/items', { method: 'POST', body: JSON.stringify(item) }),
+  saveItem: (item) => post('/items', item),
   updateItem: (id, item) => request(`/items/${id}`, { method: 'PUT', body: JSON.stringify(item) }),
   deleteItem: (id) => request(`/items/${id}`, { method: 'DELETE' }),
-  checkout: (body) => request('/bills', { method: 'POST', body: JSON.stringify(body) }),
+  checkout: (body) => post('/bills', body),
   getBills: () => request('/bills'),
 };

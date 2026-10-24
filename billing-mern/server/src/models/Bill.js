@@ -12,6 +12,7 @@ const lineSchema = new mongoose.Schema(
 
 const billSchema = new mongoose.Schema(
   {
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     invoiceNo: { type: String, required: true, unique: true },
     customerName: { type: String, default: 'Walk-in customer', trim: true },
     lines: { type: [lineSchema], validate: (v) => v.length > 0 },

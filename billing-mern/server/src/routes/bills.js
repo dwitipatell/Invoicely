@@ -15,10 +15,10 @@ async function restoreStock(deducted) {
   }
 }
 
-// GET /api/bills -> latest 50 bills
+// GET /api/bills -> latest 50 bills of this user
 router.get('/', async (req, res, next) => {
   try {
-    const bills = await Bill.find().sort({ createdAt: -1 }).limit(50).lean();
+    const bills = await Bill.find({ owner: req.user.id }).sort({ createdAt: -1 }).limit(50).lean();
     res.json(bills);
   } catch (err) {
     next(err);
@@ -27,6 +27,7 @@ router.get('/', async (req, res, next) => {
 
 // POST /api/bills  body: { customerName, items: [{ name, quantity }] }
 router.post('/', async (req, res, next) => {
+  const owner = req.user.id;
   const customerName = String(req.body.customerName ?? '').trim() || 'Walk-in customer';
   const requested = Array.isArray(req.body.items) ? req.body.items : [];
 
@@ -53,19 +54,19 @@ router.post('/', async (req, res, next) => {
     for (const { name, quantity } of merged.values()) {
       const nameKey = name.toLowerCase();
 
-      // Atomic: deduct only if enough stock exists
+      // Atomic: deduct only if this user has enough stock
       const item = await Item.findOneAndUpdate(
-        { nameKey, quantity: { $gte: quantity } },
+        { owner, nameKey, quantity: { $gte: quantity } },
         { $inc: { quantity: -quantity } },
         { new: true }
       );
 
       if (!item) {
         await restoreStock(deducted);
-        const existing = await Item.findOne({ nameKey }).lean();
+        const existing = await Item.findOne({ owner, nameKey }).lean();
         const message = existing
           ? `Only ${existing.quantity} of ${existing.name} available.`
-          : `"${name}" was not found in inventory.`;
+          : `"${name}" was not found in your inventory.`;
         return res.status(409).json({ message });
       }
 
@@ -81,6 +82,7 @@ router.post('/', async (req, res, next) => {
     const total = round2(subtotal + taxAmount);
 
     const bill = await Bill.create({
+      owner,
       invoiceNo: makeInvoiceNo(),
       customerName,
       lines,

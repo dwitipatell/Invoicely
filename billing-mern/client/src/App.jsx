@@ -31,6 +31,7 @@ export default function App() {
 
   function logout() {
     localStorage.removeItem('token');
+    localStorage.removeItem('username');
     setToken(null);
   }
 
@@ -39,7 +40,7 @@ export default function App() {
       <header className="topbar no-print">
         <div>
           <h1>Super Market Billing</h1>
-          <p className="muted">Inventory, billing and sales</p>
+          <p className="muted">Signed in as {localStorage.getItem('username')}</p>
         </div>
         <button className="secondary" onClick={logout}>Log out</button>
       </header>

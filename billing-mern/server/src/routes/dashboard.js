@@ -1,20 +1,25 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import Item from '../models/Item.js';
 import Bill from '../models/Bill.js';
 import { TAX_RATE, LOW_STOCK_THRESHOLD, round2 } from '../config/billing.js';
 
 const router = Router();
 
-// GET /api/dashboard
+// GET /api/dashboard  -> totals for the logged-in user only
 router.get('/', async (req, res, next) => {
   try {
+    const owner = new mongoose.Types.ObjectId(req.user.id);
+
     const [totals, topItems, lowStock, itemCount] = await Promise.all([
-      // Overall revenue and bill count
+      // Revenue and bill count
       Bill.aggregate([
+        { $match: { owner } },
         { $group: { _id: null, totalRevenue: { $sum: '$total' }, billCount: { $sum: 1 } } },
       ]),
-      // Top 5 items by revenue: unwind each bill's lines, group by item name
+      // Top 5 items by sales: unwind each bill's lines, group by item name
       Bill.aggregate([
+        { $match: { owner } },
         { $unwind: '$lines' },
         {
           $group: {
@@ -27,8 +32,10 @@ router.get('/', async (req, res, next) => {
         { $limit: 5 },
         { $project: { _id: 0, name: '$_id', quantitySold: 1, revenue: 1 } },
       ]),
-      Item.find({ quantity: { $lte: LOW_STOCK_THRESHOLD } }).sort({ quantity: 1 }).lean(),
-      Item.countDocuments(),
+      Item.find({ owner: req.user.id, quantity: { $lte: LOW_STOCK_THRESHOLD } })
+        .sort({ quantity: 1 })
+        .lean(),
+      Item.countDocuments({ owner: req.user.id }),
     ]);
 
     res.json({
