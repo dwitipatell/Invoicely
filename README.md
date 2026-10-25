@@ -22,11 +22,13 @@ A full-stack billing and inventory application for small shops. Manage stock, cr
 - **Per-User Data:** Each account sees only its own inventory and bills.
 
 ### login page
-![Sign In](screenshots/login.png)
+<img src="screenshots/dashboard.png" alt="Dashboard" width="500">
+
 ### Dashboard
-![Dashboard](screenshots/dashboard.png)
+<img src="screenshots/dashboard.png" alt="Dashboard" width="500">
+
 ### Printable Invoice
-![Printable Invoice](screenshots/invoice.png)
+<img src="screenshots/dashboard.png" alt="Dashboard" width="500">
 
 ---
 
