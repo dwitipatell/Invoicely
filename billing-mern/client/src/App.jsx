@@ -39,8 +39,8 @@ export default function App() {
     <div className="container">
       <header className="topbar no-print">
         <div>
-          <h1>Super Market Billing</h1>
-          <p className="muted">Signed in as {localStorage.getItem('username')}</p>
+          <h1>Invoicely</h1>
+          <p className="muted">welcome {localStorage.getItem('username')} !</p>
         </div>
         <button className="secondary" onClick={logout}>Log out</button>
       </header>

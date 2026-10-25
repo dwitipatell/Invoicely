@@ -43,8 +43,9 @@ export default function Login({ onLogin }) {
   return (
     <div className="login-wrap">
       <form className="box stack login" onSubmit={submit}>
+        <p className="muted">INVOICELY</p>
+        <p className='tagline'>Smarter billing for growing businesses</p>
         <h1>{isRegister ? 'Create account' : 'Sign in'}</h1>
-        <p className="muted">Super Market Billing System</p>
 
         <input placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)}
           autoComplete="username" required autoFocus />
