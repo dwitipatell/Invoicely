@@ -9,7 +9,9 @@
 
 A full-stack billing and inventory application for small shops. Manage stock, create GST bills, print invoices, and track sales. Each account has its own inventory and bills.
 
----
+*🚀 [Live Demo](https://invoicely-dwiti.vercel.app)* · *[GitHub Repository](https://github.com/dwitipatell/Invoicely)*
+
+Create a free account on the sign-in page to try it.
 
 ## Features
 
@@ -21,7 +23,7 @@ A full-stack billing and inventory application for small shops. Manage stock, cr
 - **Dashboard:** Track revenue, bill count, item count, low-stock count, and the top 5 selling items using MongoDB aggregation.
 - **Per-User Data:** Each account sees only its own inventory and bills.
 
-### login page
+### Login page
 <img src="screenshots/dashboard.png" alt="Dashboard" width="500">
 
 ### Dashboard
@@ -204,5 +206,4 @@ Create a free account on the sign-in page to try Invoicely.
 
 - **GitHub Profile:** [@dwitipatell](https://github.com/dwitipatell)
 - **Invoicely Repository:** [View Project](https://github.com/dwitipatell/Invoicely)
-- **Live Demo:** [Try Invoicely](https://invoicely-dwiti.vercel.app)
 
